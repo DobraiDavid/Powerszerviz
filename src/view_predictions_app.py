@@ -13,51 +13,171 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-# ── CSS: clean minimalist light theme ─────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# CSS – forces light theme on every element regardless of OS dark-mode setting.
+# Targets both Streamlit's internal data-testid selectors AND the raw HTML
+# elements that vary between themes.
+# ─────────────────────────────────────────────────────────────────────────────
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap');
 
-html, body, [data-testid="stAppViewContainer"] {
-    background: #f7f8fa !important;
+/* ── Hard-reset: force light background on every Streamlit shell element ── */
+html, body,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+[data-testid="block-container"],
+.main, .main > div,
+[data-testid="stVerticalBlock"],
+[data-testid="stHorizontalBlock"],
+section[data-testid="stSidebar"] > div,
+.stApp {
+    background-color: #f7f8fa !important;
     color: #1a1f2e !important;
     font-family: 'IBM Plex Sans', sans-serif !important;
 }
-[data-testid="stSidebar"] {
-    background: #eef0f4 !important;
-    border-right: 1px solid #d8dce6;
-}
-h1 { font-size: 1.6rem !important; font-weight: 600 !important; color: #1a1f2e !important;
-     letter-spacing: .5px; border-bottom: 2px solid #e2e5ec; padding-bottom: .4rem; }
-h2, h3 { color: #1a1f2e !important; font-weight: 600 !important; font-size: 1rem !important;
-          text-transform: uppercase; letter-spacing: 1px; }
 
+/* ── Sidebar ── */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebarContent"] {
+    background-color: #eef0f4 !important;
+    border-right: 1px solid #d8dce6 !important;
+}
+[data-testid="stSidebar"] * { color: #1a1f2e !important; }
+
+/* ── Headings ── */
+h1 {
+    font-size: clamp(1.2rem, 2vw, 1.7rem) !important;
+    font-weight: 600 !important;
+    color: #1a1f2e !important;
+    letter-spacing: .5px;
+    border-bottom: 2px solid #e2e5ec;
+    padding-bottom: .4rem;
+}
+h2, h3 {
+    color: #1a1f2e !important;
+    font-weight: 600 !important;
+    font-size: clamp(.8rem, 1.1vw, 1rem) !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Paragraph / caption text ── */
+p, span, label, div {
+    color: #1a1f2e !important;
+}
+.stCaption, small { color: #9ca3af !important; font-size: .75rem !important; }
+
+/* ── Buttons ── */
 .stButton > button {
-    background: #fff !important; color: #1a1f2e !important;
-    border: 1px solid #c8cdd8 !important; border-radius: 4px !important;
+    background: #ffffff !important;
+    color: #1a1f2e !important;
+    border: 1px solid #c8cdd8 !important;
+    border-radius: 4px !important;
     font-family: 'IBM Plex Mono', monospace !important;
-    font-size: .8rem !important; padding: 4px 14px !important;
+    font-size: clamp(.7rem, .9vw, .85rem) !important;
+    padding: 5px 16px !important;
     transition: border-color .15s, box-shadow .15s;
 }
-.stButton > button:hover { border-color: #4a6cf7 !important; box-shadow: 0 0 0 2px rgba(74,108,247,.15) !important; }
+.stButton > button:hover {
+    border-color: #4a6cf7 !important;
+    box-shadow: 0 0 0 2px rgba(74,108,247,.15) !important;
+}
 
-.stSelectbox label { font-size: .75rem !important; font-weight: 600 !important;
-                     text-transform: uppercase; letter-spacing: 1px; color: #6b7280 !important; }
-.stSelectbox > div > div { background: #fff !important; border: 1px solid #c8cdd8 !important;
-                            border-radius: 4px !important; }
+/* ── Selectbox ── */
+.stSelectbox label {
+    font-size: clamp(.68rem, .85vw, .78rem) !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b7280 !important;
+}
+.stSelectbox > div > div,
+[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    border: 1px solid #c8cdd8 !important;
+    border-radius: 4px !important;
+    color: #1a1f2e !important;
+}
+[data-baseweb="popover"] ul,
+[data-baseweb="menu"] {
+    background-color: #ffffff !important;
+    border: 1px solid #d8dce6 !important;
+}
+[data-baseweb="popover"] li,
+[data-baseweb="menu"] li {
+    background-color: #ffffff !important;
+    color: #1a1f2e !important;
+}
+[data-baseweb="popover"] li:hover,
+[data-baseweb="menu"] li:hover {
+    background-color: #eef0f4 !important;
+}
 
-[data-testid="stTable"] table { font-family: 'IBM Plex Mono', monospace !important;
-    font-size: .78rem !important; border-collapse: collapse !important; width: 100%; }
-[data-testid="stTable"] th { background: #eef0f4 !important; color: #6b7280 !important;
-    border-bottom: 2px solid #d8dce6 !important; text-transform: uppercase;
-    letter-spacing: 1px; padding: 6px 10px !important; }
-[data-testid="stTable"] td { border-bottom: 1px solid #e8ebf0 !important;
-    padding: 5px 10px !important; color: #1a1f2e !important; }
+/* ── st.table (small model output table) ── */
+[data-testid="stTable"] {
+    background-color: #ffffff !important;
+}
+[data-testid="stTable"] table {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: clamp(.68rem, .85vw, .78rem) !important;
+    border-collapse: collapse !important;
+    width: 100%;
+    background-color: #ffffff !important;
+}
+[data-testid="stTable"] th {
+    background-color: #eef0f4 !important;
+    color: #6b7280 !important;
+    border-bottom: 2px solid #d8dce6 !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 6px 10px !important;
+    white-space: nowrap;
+}
+[data-testid="stTable"] td {
+    border-bottom: 1px solid #e8ebf0 !important;
+    padding: 5px 10px !important;
+    color: #1a1f2e !important;
+    background-color: #ffffff !important;
+}
 
+/* ── Styled dataframe (day overview) ── */
+[data-testid="stDataFrame"],
+.stDataFrame iframe,
+.dataframe-container {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e5ec !important;
+    border-radius: 4px;
+}
+
+/* ── Radio buttons ── */
+[data-testid="stRadio"] label { color: #1a1f2e !important; }
+[data-testid="stRadio"] { background: transparent !important; }
+
+/* ── Dividers ── */
 hr { border-color: #e2e5ec !important; }
-.stCaption { color: #9ca3af !important; font-size: .75rem !important; }
+
+/* ── Info boxes ── */
+[data-testid="stAlert"] {
+    background-color: #eff6ff !important;
+    color: #1a1f2e !important;
+    border: 1px solid #bfdbfe !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f7f8fa; }
+::-webkit-scrollbar-thumb { background: #c8cdd8; border-radius: 3px; }
+
+/* ── Responsive column gap tightening on smaller widths ── */
+@media (max-width: 1400px) {
+    [data-testid="stHorizontalBlock"] { gap: .5rem !important; }
+    .stButton > button { padding: 4px 10px !important; font-size: .7rem !important; }
+}
 </style>
 """
+
 
 RISK_CFG = {
     "low":     {"bg": "#f0fdf4", "border": "#86efac", "text": "#16a34a", "bar": "#22c55e", "icon": "▼", "hu": "ALACSONY"},
@@ -75,13 +195,13 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
     if p_aggregate is not None:
         pct = round(p_aggregate * 100, 1)
         pct_bar = (
-            '<div style="margin-top:14px;">'
+            '<div style="margin-top:12px;">'
             '<div style="display:flex;justify-content:space-between;'
-            'font-size:.72rem;color:#6b7280;font-family:\'IBM Plex Mono\',monospace;margin-bottom:5px;">'
+            'font-size:.7rem;color:#6b7280;font-family:\'IBM Plex Mono\',monospace;margin-bottom:4px;">'
             '<span>P_AGGREGATE</span>'
             f'<span>{pct}%</span>'
             '</div>'
-            '<div style="background:#e8ebf0;border-radius:4px;height:7px;overflow:hidden;">'
+            '<div style="background:#e8ebf0;border-radius:4px;height:6px;overflow:hidden;">'
             f'<div style="width:{pct}%;height:100%;background:{c["bar"]};border-radius:4px;"></div>'
             '</div>'
             '</div>'
@@ -91,8 +211,8 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
     if label == "high":
         pulse = (
             "<style>@keyframes soft-pulse{"
-            "0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.25)}"
-            "50%{box-shadow:0 0 0 6px rgba(239,68,68,.0)}}"
+            "0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.2)}"
+            "50%{box-shadow:0 0 0 5px rgba(239,68,68,.0)}}"
             "#risk-card{animation:soft-pulse 2s ease-in-out infinite;}</style>"
         )
 
@@ -100,14 +220,14 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
         f"{pulse}"
         '<div id="risk-card" style="'
         f'background:{c["bg"]};border:1.5px solid {c["border"]};border-radius:8px;'
-        'padding:18px 22px;margin-bottom:12px;">'
-        '<div style="font-size:.68rem;font-weight:600;text-transform:uppercase;'
-        'letter-spacing:2px;color:#9ca3af;font-family:\'IBM Plex Sans\',sans-serif;margin-bottom:4px;">'
+        'padding:14px 18px;margin-bottom:10px;">'
+        '<div style="font-size:.65rem;font-weight:600;text-transform:uppercase;'
+        'letter-spacing:2px;color:#9ca3af;font-family:\'IBM Plex Sans\',sans-serif;margin-bottom:3px;">'
         'Összesített kockázat'
         '</div>'
-        '<div style="display:flex;align-items:center;gap:12px;">'
-        f'<span style="font-size:2rem;color:{c["text"]};">{c["icon"]}</span>'
-        f'<span style="font-size:2.2rem;font-weight:700;color:{c["text"]};'
+        '<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:1.7rem;color:{c["text"]};">{c["icon"]}</span>'
+        f'<span style="font-size:1.9rem;font-weight:700;color:{c["text"]};'
         'font-family:\'IBM Plex Sans\',sans-serif;letter-spacing:2px;">'
         f'{c["hu"]}'
         '</span>'
@@ -120,9 +240,10 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
 
 def status_pill(label: str, color: str, icon: str) -> str:
     return (
-        f'<div style="display:inline-flex;align-items:center;gap:6px;'
-        f'border:1px solid {color};border-radius:20px;padding:4px 12px;'
-        f'margin:3px 3px 3px 0;font-size:.78rem;color:{color};'
+        f'<div style="display:inline-flex;align-items:center;gap:5px;'
+        f'border:1px solid {color};border-radius:20px;padding:3px 10px;'
+        f'margin:2px 2px 2px 0;font-size:.72rem;color:{color};'
+        f'background-color:#ffffff;'
         f'font-family:\'IBM Plex Sans\',sans-serif;font-weight:600;">'
         f'{icon} {label}</div>'
     )
@@ -155,14 +276,18 @@ def find_nearest_index(idx: pd.DatetimeIndex, ts: pd.Timestamp) -> Optional[pd.T
 
 
 def main() -> None:
-    st.set_page_config(page_title="Powerszerviz előrejelzés", layout="wide", page_icon="⚡")
+    st.set_page_config(
+        page_title="Powerszerviz előrejelzés",
+        layout="wide",
+        page_icon="⚡",
+    )
     st.markdown(CSS, unsafe_allow_html=True)
 
     mode = st.sidebar.radio("Mód", ["Hiba", "Karbantartás"], index=0)
     is_maint = mode == "Karbantartás"
     mode_key = "maintenance" if is_maint else "fault"
 
-    st.title("⚡ " + ("Karbantartás" if is_maint else "Hiba") + " Előrejelzés")
+    st.title("⚡ Powerszerviz – " + ("Karbantartás" if is_maint else "Hiba") + " Előrejelzés")
     st.caption(
         "Az adatok csak a motor működése (vagy pufferperiódus) alatt keletkeznek — "
         "a többi időszakban nincsenek sorok, így az idővonalban hézagok lehetnek."
@@ -170,18 +295,16 @@ def main() -> None:
 
     df = load_merged_frame(mode_key)
 
-    # Initialise session state
+    # ── Session state ─────────────────────────────────────────────────────────
     if "current_ts" not in st.session_state:
         st.session_state["current_ts"] = df.index[0]
     if "last_mode" not in st.session_state:
         st.session_state["last_mode"] = mode_key
-
-    # Reset timestamp when mode switches
     if st.session_state["last_mode"] != mode_key:
         st.session_state["current_ts"] = df.index[0]
         st.session_state["last_mode"] = mode_key
 
-    # ── Event days for 🔴 markers ─────────────────────────────────────────────
+    # ── Event days ────────────────────────────────────────────────────────────
     event_col_name = "maintenance_event" if is_maint else "fault_event"
     if event_col_name in df.columns:
         event_days = set(df.index[df[event_col_name].astype(bool)].date)
@@ -193,21 +316,20 @@ def main() -> None:
     def label_date(d):
         return f"🔴 {d}" if d in event_days else str(d)
 
-    date_labels = [label_date(d) for d in available_dates]
+    date_labels  = [label_date(d) for d in available_dates]
     label_to_date = dict(zip(date_labels, available_dates))
 
-    # ── Resolve current timestamp (written once, read below) ─────────────────
     current_ts: pd.Timestamp = st.session_state["current_ts"]
 
-    # ── Top controls row ──────────────────────────────────────────────────────
-    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1, 1, 2, 2, 2])
+    # ── Controls row ──────────────────────────────────────────────────────────
+    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1, 1, 2, 2, 3])
 
     with ctrl1:
         prev_clicked = st.button("◀ Előző perc")
     with ctrl2:
         next_clicked = st.button("Következő perc ▶")
 
-    # Apply prev/next navigation first so the selectors below reflect the new ts
+    # Resolve navigation BEFORE the selectboxes render their default index
     navigated = False
     if prev_clicked:
         pos = df.index.get_loc(current_ts)
@@ -232,7 +354,6 @@ def main() -> None:
             default_date_idx = date_labels.index(current_date_label)
         except ValueError:
             default_date_idx = 0
-
         selected_date_label = st.selectbox(
             "Dátum  (🔴 = esemény nap)",
             options=date_labels,
@@ -248,21 +369,19 @@ def main() -> None:
                 default_time_idx = times_for_date.index(current_ts.time())
             else:
                 default_time_idx = 0
-
             time_selected = st.selectbox(
                 "Perc (csak ahol van adat)",
                 options=times_for_date,
                 index=default_time_idx,
                 key=f"time_sel_{mode_key}",
             )
-            # Only apply selectbox value if the user wasn't pressing prev/next
             if not navigated:
                 combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
                 if combined_ts in df.index:
                     current_ts = combined_ts
                     st.session_state["current_ts"] = current_ts
 
-    # Compute row here so ctrl5 can use it
+    # ── Risk banner + status (ctrl5, same row as controls) ───────────────────
     row = df.loc[current_ts]
     risk_agg_col = "risk_maint_aggregate" if is_maint else "risk_aggregate"
     p_agg_col    = "p_maint_aggregate"    if is_maint else "p_aggregate"
@@ -276,10 +395,10 @@ def main() -> None:
     with ctrl5:
         st.markdown(risk_banner_html(risk_val, p_agg_f), unsafe_allow_html=True)
         st.markdown(
-            '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:.72rem;'
-            'color:#9ca3af;margin-bottom:1px;">IDŐBÉLYEG</div>'
-            f'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:.82rem;'
-            f'color:#1a1f2e;margin-bottom:6px;">{current_ts}</div>',
+            '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:.7rem;'
+            'color:#9ca3af !important;margin-bottom:1px;">IDŐBÉLYEG</div>'
+            f'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:.8rem;'
+            f'color:#1a1f2e !important;margin-bottom:5px;">{current_ts}</div>',
             unsafe_allow_html=True,
         )
         pills_html = ""
@@ -339,10 +458,10 @@ def main() -> None:
             styles = []
             for col in row.index:
                 if is_event:
-                    bg = "background-color: #fca5a5;"  # strong red bg
+                    bg      = "background-color: #fca5a5;"
                     base_fg = "color: #7f1d1d; font-weight: 700;"
                 else:
-                    bg = ""
+                    bg      = "background-color: #ffffff;"
                     base_fg = "color: #1a1f2e;"
                 if col in risk_col_names:
                     fg = RISK_TEXT.get(str(row[col]).strip().lower(), "color: #1a1f2e")
@@ -356,17 +475,28 @@ def main() -> None:
             .apply(style_row, axis=1)
             .set_table_styles([
                 {"selector": "thead th", "props": [
-                    ("background", "#eef0f4"), ("color", "#6b7280"),
+                    ("background-color", "#eef0f4"),
+                    ("color", "#6b7280"),
                     ("border-bottom", "2px solid #d8dce6"),
-                    ("text-transform", "uppercase"), ("letter-spacing", "1px"),
-                    ("font-size", ".72rem"), ("padding", "6px 10px"),
+                    ("text-transform", "uppercase"),
+                    ("letter-spacing", "1px"),
+                    ("font-size", ".72rem"),
+                    ("padding", "6px 10px"),
+                    ("white-space", "nowrap"),
                 ]},
                 {"selector": "table", "props": [
-                    ("border-collapse", "collapse"), ("width", "100%"),
-                    ("font-family", "'IBM Plex Mono', monospace"), ("font-size", ".78rem"),
+                    ("border-collapse", "collapse"),
+                    ("width", "100%"),
+                    ("font-family", "'IBM Plex Mono', monospace"),
+                    ("font-size", ".78rem"),
+                    ("background-color", "#ffffff"),
                 ]},
                 {"selector": "td", "props": [
-                    ("border-bottom", "1px solid #e8ebf0"), ("padding", "4px 10px"),
+                    ("border-bottom", "1px solid #e8ebf0"),
+                    ("padding", "4px 10px"),
+                ]},
+                {"selector": "tr:hover td", "props": [
+                    ("filter", "brightness(0.97)"),
                 ]},
             ])
         )
@@ -374,7 +504,7 @@ def main() -> None:
 
     st.markdown("---")
 
-    # ── Bottom: model outputs ─────────────────────────────────────────────────
+    # ── Model outputs ─────────────────────────────────────────────────────────
     st.subheader("Modell kimenetek")
     if is_maint:
         model_cols = [
