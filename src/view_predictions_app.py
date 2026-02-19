@@ -447,67 +447,60 @@ def main() -> None:
         table_df = day_df[display_cols].copy()
         risk_col_names = [c for c in table_df.columns if "risk" in c]
 
-        # Render as raw HTML via st.markdown so it lives in the main DOM
-        # and is fully controlled by our CSS (st.write(styled) goes into
-        # an iframe that ignores injected styles).
-        RISK_TEXT_COLOR = {"low": "#16a34a", "medium": "#d97706", "high": "#dc2626"}
+        RISK_TEXT = {
+            "low":    "color: #16a34a",
+            "medium": "color: #d97706",
+            "high":   "color: #dc2626",
+        }
 
-        # Build header
-        th_index = (
-            '<th style="background:#eef0f4;color:#6b7280;border-bottom:2px solid #d8dce6;'
-            'text-transform:uppercase;letter-spacing:1px;font-size:.7rem;'
-            'padding:6px 10px;white-space:nowrap;font-family:\'IBM Plex Mono\',monospace;">'
-            'Időpont</th>'
-        )
-        th_cols = "".join(
-            f'<th style="background:#eef0f4;color:#6b7280;border-bottom:2px solid #d8dce6;'
-            f'text-transform:uppercase;letter-spacing:1px;font-size:.7rem;'
-            f'padding:6px 10px;white-space:nowrap;font-family:\'IBM Plex Mono\',monospace;">'
-            f'{col}</th>'
-            for col in table_df.columns
-        )
-
-        rows_html = ""
-        for idx, row_s in table_df.iterrows():
-            is_event = ev_col in row_s.index and bool(row_s.get(ev_col, False))
-            row_bg   = "#fca5a5" if is_event else "#ffffff"
-            row_fg   = "#7f1d1d" if is_event else "#1a1f2e"
-            fw       = "700"     if is_event else "400"
-
-            td_index = (
-                f'<td style="background:{row_bg};color:{row_fg};font-weight:{fw};'
-                f'border-bottom:1px solid #e8ebf0;padding:4px 10px;'
-                f'font-family:\'IBM Plex Mono\',monospace;font-size:.75rem;white-space:nowrap;">'
-                f'{idx}</td>'
-            )
-            tds = ""
-            for col in table_df.columns:
-                val = row_s[col]
-                if col in risk_col_names:
-                    fg  = RISK_TEXT_COLOR.get(str(val).strip().lower(), row_fg)
-                    tds += (
-                        f'<td style="background:{row_bg};color:{fg};font-weight:600;'
-                        f'border-bottom:1px solid #e8ebf0;padding:4px 10px;'
-                        f'font-family:\'IBM Plex Mono\',monospace;font-size:.75rem;">'
-                        f'{val}</td>'
-                    )
+        def style_row(row: pd.Series) -> list[str]:
+            is_event = ev_col in row.index and bool(row.get(ev_col, False))
+            styles = []
+            for col in row.index:
+                if is_event:
+                    bg      = "background-color: #fca5a5;"
+                    base_fg = "color: #7f1d1d; font-weight: 700;"
                 else:
-                    tds += (
-                        f'<td style="background:{row_bg};color:{row_fg};font-weight:{fw};'
-                        f'border-bottom:1px solid #e8ebf0;padding:4px 10px;'
-                        f'font-family:\'IBM Plex Mono\',monospace;font-size:.75rem;">'
-                        f'{val}</td>'
-                    )
-            rows_html += f"<tr>{td_index}{tds}</tr>"
+                    bg      = "background-color: #ffffff;"
+                    base_fg = "color: #1a1f2e;"
+                if col in risk_col_names:
+                    fg = RISK_TEXT.get(str(row[col]).strip().lower(), "color: #1a1f2e")
+                    styles.append(f"{bg} {fg}; font-weight: 600;")
+                else:
+                    styles.append(f"{bg} {base_fg}")
+            return styles
 
-        html_table = (
-            '<div style="overflow-x:auto;border:1px solid #e2e5ec;border-radius:6px;">'
-            '<table style="border-collapse:collapse;width:100%;background:#ffffff;">'
-            f'<thead><tr>{th_index}{th_cols}</tr></thead>'
-            f'<tbody>{rows_html}</tbody>'
-            '</table></div>'
+        styled = (
+            table_df.style
+            .apply(style_row, axis=1)
+            .set_table_styles([
+                {"selector": "thead th", "props": [
+                    ("background-color", "#eef0f4"),
+                    ("color", "#6b7280"),
+                    ("border-bottom", "2px solid #d8dce6"),
+                    ("text-transform", "uppercase"),
+                    ("letter-spacing", "1px"),
+                    ("font-size", ".72rem"),
+                    ("padding", "6px 10px"),
+                    ("white-space", "nowrap"),
+                ]},
+                {"selector": "table", "props": [
+                    ("border-collapse", "collapse"),
+                    ("width", "100%"),
+                    ("font-family", "'IBM Plex Mono', monospace"),
+                    ("font-size", ".78rem"),
+                    ("background-color", "#ffffff"),
+                ]},
+                {"selector": "td", "props": [
+                    ("border-bottom", "1px solid #e8ebf0"),
+                    ("padding", "4px 10px"),
+                ]},
+                {"selector": "tr:hover td", "props": [
+                    ("filter", "brightness(0.97)"),
+                ]},
+            ])
         )
-        st.markdown(html_table, unsafe_allow_html=True)
+        st.write(styled)
 
     st.markdown("---")
 
@@ -525,42 +518,9 @@ def main() -> None:
             "risk_1h", "risk_6h", "risk_24h", "risk_3d", "risk_ttf", "risk_aggregate",
         ]
     present_cols = [c for c in model_cols if c in df.columns]
-
-    TH = (
-        'style="background:#eef0f4;color:#6b7280;border-bottom:2px solid #d8dce6;'
-        'text-transform:uppercase;letter-spacing:1px;font-size:.7rem;'
-        'padding:6px 12px;white-space:nowrap;font-family:\'IBM Plex Mono\',monospace;text-align:left;"'
-    )
-    TD_KEY = (
-        'style="background:#ffffff;color:#6b7280;border-bottom:1px solid #e8ebf0;'
-        'padding:5px 12px;font-family:\'IBM Plex Mono\',monospace;font-size:.75rem;'
-        'font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;"'
-    )
-    RISK_VAL_COLOR = {"low": "#16a34a", "medium": "#d97706", "high": "#dc2626"}
-
-    model_rows = ""
-    for c in present_cols:
-        val     = str(row.get(c))
-        is_risk = "risk" in c
-        color   = RISK_VAL_COLOR.get(val.strip().lower(), "#1a1f2e") if is_risk else "#1a1f2e"
-        fw      = "600" if is_risk else "400"
-        td_val  = (
-            f'style="background:#ffffff;color:{color};border-bottom:1px solid #e8ebf0;'
-            f'padding:5px 12px;font-family:\'IBM Plex Mono\',monospace;font-size:.75rem;font-weight:{fw};"'
-        )
-        model_rows += f"<tr><td {TD_KEY}>{c}</td><td {td_val}>{val}</td></tr>"
-
-    model_html = (
-        '<div style="overflow-x:auto;border:1px solid #e2e5ec;border-radius:6px;max-width:600px;">'
-        '<table style="border-collapse:collapse;width:100%;background:#ffffff;">'
-        f'<thead><tr>'
-        f'<th {TH}>Mutató</th>'
-        f'<th {TH}>Érték</th>'
-        f'</tr></thead>'
-        f'<tbody>{model_rows}</tbody>'
-        '</table></div>'
-    )
-    st.markdown(model_html, unsafe_allow_html=True)
+    small_df = pd.DataFrame({c: [str(row.get(c))] for c in present_cols}).T
+    small_df.columns = ["érték"]
+    st.table(small_df)
 
 
 if __name__ == "__main__":
