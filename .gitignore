@@ -2,3 +2,4 @@ models/
 Data/
 __pycache__/
 *.pkl
+*.docx
