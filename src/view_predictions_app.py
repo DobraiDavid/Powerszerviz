@@ -321,31 +321,13 @@ def main() -> None:
 
     current_ts: pd.Timestamp = st.session_state["current_ts"]
 
-    # ── Controls row: date col | time col | risk banner ───────────────────────
+    # ── Button clicks — evaluated BEFORE any widget renders ───────────────────
+    # We use placeholder columns here just to collect clicks; dropdowns come after.
     col_date, col_time, col_risk = st.columns([2, 2, 3])
 
-    # ── Pre-write selectbox session state keys so dropdowns always reflect
-    #    current_ts, regardless of what Streamlit cached previously ────────────
-    date_key = f"date_sel_{mode_key}"
-    time_key = f"time_sel_{mode_key}"
-
-    correct_date_label = label_date(current_ts.date())
-    st.session_state[date_key] = correct_date_label
-
-    times_for_current_date = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-    if current_ts.time() in times_for_current_date:
-        st.session_state[time_key] = current_ts.time()
-    elif times_for_current_date:
-        st.session_state[time_key] = times_for_current_date[0]
-
-    # ── Render dropdowns first, then buttons underneath ───────────────────────
     with col_date:
-        selected_date_label = st.selectbox(
-            "Dátum  (🔴 = esemény nap)",
-            options=date_labels,
-            key=date_key,
-        )
-        date_selected = label_to_date[selected_date_label]
+        # Reserve space; selectbox rendered below after we know current_ts
+        date_placeholder = st.empty()
         d_prev_col, d_next_col = st.columns(2)
         with d_prev_col:
             date_prev_clicked = st.button("◀ Előző nap", key="btn_date_prev", use_container_width=True)
@@ -353,29 +335,21 @@ def main() -> None:
             date_next_clicked = st.button("Köv. nap ▶", key="btn_date_next", use_container_width=True)
 
     with col_time:
-        times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
-        if times_for_date:
-            time_selected = st.selectbox(
-                "Perc (csak ahol van adat)",
-                options=times_for_date,
-                key=time_key,
-            )
+        time_placeholder = st.empty()
         t_prev_col, t_next_col = st.columns(2)
         with t_prev_col:
             time_prev_clicked = st.button("◀ Előző perc", key="btn_time_prev", use_container_width=True)
         with t_next_col:
             time_next_clicked = st.button("Köv. perc ▶", key="btn_time_next", use_container_width=True)
 
-    # ── Apply navigation logic ────────────────────────────────────────────────
-    navigated = False
-
+    # ── Apply button navigation ────────────────────────────────────────────────
     if time_prev_clicked:
         pos = df.index.get_loc(current_ts)
         if isinstance(pos, slice):
             pos = pos.start
         if pos - 1 >= 0:
             current_ts = df.index[pos - 1]
-        navigated = True
+            st.session_state["current_ts"] = current_ts
 
     elif time_next_clicked:
         pos = df.index.get_loc(current_ts)
@@ -383,42 +357,59 @@ def main() -> None:
             pos = pos.start
         if pos + 1 < len(df.index):
             current_ts = df.index[pos + 1]
-        navigated = True
+            st.session_state["current_ts"] = current_ts
 
     elif date_prev_clicked:
-        cur_date = current_ts.date()
-        cur_date_idx = available_dates.index(cur_date) if cur_date in available_dates else 0
+        cur_date_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
         if cur_date_idx > 0:
             new_date = available_dates[cur_date_idx - 1]
             times_on_day = sorted({ts.time() for ts in df.index if ts.date() == new_date})
             if times_on_day:
                 current_ts = pd.Timestamp(datetime.combine(new_date, times_on_day[0]))
-        navigated = True
+                st.session_state["current_ts"] = current_ts
 
     elif date_next_clicked:
-        cur_date = current_ts.date()
-        cur_date_idx = available_dates.index(cur_date) if cur_date in available_dates else 0
+        cur_date_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
         if cur_date_idx < len(available_dates) - 1:
             new_date = available_dates[cur_date_idx + 1]
             times_on_day = sorted({ts.time() for ts in df.index if ts.date() == new_date})
             if times_on_day:
                 current_ts = pd.Timestamp(datetime.combine(new_date, times_on_day[0]))
-        navigated = True
+                st.session_state["current_ts"] = current_ts
 
-    elif not navigated and times_for_date:
-        # Manual selectbox change
-        combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
-        if combined_ts in df.index:
-            current_ts = combined_ts
+    # ── Render dropdowns into placeholders, driven purely by index ────────────
+    # No `key=` on these selectboxes — avoids the session_state write-after-render error.
+    current_date_label = label_date(current_ts.date())
+    try:
+        default_date_idx = date_labels.index(current_date_label)
+    except ValueError:
+        default_date_idx = 0
 
-    # Always persist the resolved timestamp
-    st.session_state["current_ts"] = current_ts
+    selected_date_label = date_placeholder.selectbox(
+        "Dátum  (🔴 = esemény nap)",
+        options=date_labels,
+        index=default_date_idx,
+    )
+    date_selected = label_to_date[selected_date_label]
 
-    # Re-write session state keys after navigation so next render is correct
-    if navigated:
-        st.session_state[date_key] = label_date(current_ts.date())
-        tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-        st.session_state[time_key] = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
+    times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
+    if times_for_date:
+        if current_ts.date() == date_selected and current_ts.time() in times_for_date:
+            default_time_idx = times_for_date.index(current_ts.time())
+        else:
+            default_time_idx = 0
+        time_selected = time_placeholder.selectbox(
+            "Perc (csak ahol van adat)",
+            options=times_for_date,
+            index=default_time_idx,
+        )
+        # Only apply manual selectbox pick when no button was pressed this cycle
+        button_pressed = any([time_prev_clicked, time_next_clicked, date_prev_clicked, date_next_clicked])
+        if not button_pressed:
+            combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
+            if combined_ts in df.index:
+                current_ts = combined_ts
+                st.session_state["current_ts"] = current_ts
 
     # ── Risk banner + status (ctrl5, same row as controls) ───────────────────
     row = df.loc[current_ts]
