@@ -42,11 +42,10 @@ class RiskThresholds:
     # 24h: target ~80–85% of covered episodes (sweep: 0.1625 -> 80.4%)
     low_24h: Optional[float] = 0.08
     medium_24h: Optional[float] = 0.1625
-    # Aggregate (meta-model for 6h risk): aim for high precision, ~80% episode recall
-    # (sweep: 0.3333 -> 100%, 1.0 -> 70.6%; choose ~0.60 between them)
-    # Use 0.34 as low/high boundary so 0.3333 is always treated as 'low'.
-    low_aggregate: Optional[float] = 0.34
-    medium_aggregate: Optional[float] = 0.60
+    # Aggregate (meta-model for 6h risk): aim for ≥85% episode recall (more faults preceded by high risk)
+    # (sweep: 0.3333 -> 100% episodes have high in window, 0.60 -> 70.6%; 0.35 gives ~85%+)
+    low_aggregate: Optional[float] = 0.25
+    medium_aggregate: Optional[float] = 0.35
 
     def get_low(self, horizon: str) -> float:
         if horizon == "1h" and self.low_1h is not None:

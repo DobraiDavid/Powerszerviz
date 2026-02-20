@@ -324,16 +324,49 @@ def main() -> None:
     # ── Controls row: date col | time col | risk banner ───────────────────────
     col_date, col_time, col_risk = st.columns([2, 2, 3])
 
-    # ── Collect all button clicks first (before any widget renders) ───────────
+    # ── Pre-write selectbox session state keys so dropdowns always reflect
+    #    current_ts, regardless of what Streamlit cached previously ────────────
+    date_key = f"date_sel_{mode_key}"
+    time_key = f"time_sel_{mode_key}"
+
+    correct_date_label = label_date(current_ts.date())
+    st.session_state[date_key] = correct_date_label
+
+    times_for_current_date = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
+    if current_ts.time() in times_for_current_date:
+        st.session_state[time_key] = current_ts.time()
+    elif times_for_current_date:
+        st.session_state[time_key] = times_for_current_date[0]
+
+    # ── Render dropdowns first, then buttons underneath ───────────────────────
     with col_date:
-        date_prev_clicked = st.button("◀ Előző nap", key="btn_date_prev")
-        date_next_clicked = st.button("Következő nap ▶", key="btn_date_next")
+        selected_date_label = st.selectbox(
+            "Dátum  (🔴 = esemény nap)",
+            options=date_labels,
+            key=date_key,
+        )
+        date_selected = label_to_date[selected_date_label]
+        d_prev_col, d_next_col = st.columns(2)
+        with d_prev_col:
+            date_prev_clicked = st.button("◀ Előző nap", key="btn_date_prev", use_container_width=True)
+        with d_next_col:
+            date_next_clicked = st.button("Köv. nap ▶", key="btn_date_next", use_container_width=True)
 
     with col_time:
-        time_prev_clicked = st.button("◀ Előző perc", key="btn_time_prev")
-        time_next_clicked = st.button("Következő perc ▶", key="btn_time_next")
+        times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
+        if times_for_date:
+            time_selected = st.selectbox(
+                "Perc (csak ahol van adat)",
+                options=times_for_date,
+                key=time_key,
+            )
+        t_prev_col, t_next_col = st.columns(2)
+        with t_prev_col:
+            time_prev_clicked = st.button("◀ Előző perc", key="btn_time_prev", use_container_width=True)
+        with t_next_col:
+            time_next_clicked = st.button("Köv. perc ▶", key="btn_time_next", use_container_width=True)
 
-    # ── Apply navigation logic, updating current_ts and session state ─────────
+    # ── Apply navigation logic ────────────────────────────────────────────────
     navigated = False
 
     if time_prev_clicked:
@@ -372,46 +405,20 @@ def main() -> None:
                 current_ts = pd.Timestamp(datetime.combine(new_date, times_on_day[0]))
         navigated = True
 
+    elif not navigated and times_for_date:
+        # Manual selectbox change
+        combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
+        if combined_ts in df.index:
+            current_ts = combined_ts
+
     # Always persist the resolved timestamp
     st.session_state["current_ts"] = current_ts
 
-    # ── Pre-write selectbox session state keys so dropdowns always reflect
-    #    current_ts, regardless of what Streamlit cached previously ────────────
-    date_key = f"date_sel_{mode_key}"
-    time_key = f"time_sel_{mode_key}"
-
-    correct_date_label = label_date(current_ts.date())
-    st.session_state[date_key] = correct_date_label
-
-    times_for_current_date = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-    if current_ts.time() in times_for_current_date:
-        st.session_state[time_key] = current_ts.time()
-    elif times_for_current_date:
-        st.session_state[time_key] = times_for_current_date[0]
-
-    # ── Now render the selectboxes (they will show the pre-written values) ─────
-    with col_date:
-        selected_date_label = st.selectbox(
-            "Dátum  (🔴 = esemény nap)",
-            options=date_labels,
-            key=date_key,
-        )
-        date_selected = label_to_date[selected_date_label]
-
-    with col_time:
-        times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
-        if times_for_date:
-            time_selected = st.selectbox(
-                "Perc (csak ahol van adat)",
-                options=times_for_date,
-                key=time_key,
-            )
-            # Only apply selectbox change when user picked manually (no button pressed)
-            if not navigated:
-                combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
-                if combined_ts in df.index:
-                    current_ts = combined_ts
-                    st.session_state["current_ts"] = current_ts
+    # Re-write session state keys after navigation so next render is correct
+    if navigated:
+        st.session_state[date_key] = label_date(current_ts.date())
+        tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
+        st.session_state[time_key] = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
 
     # ── Risk banner + status (ctrl5, same row as controls) ───────────────────
     row = df.loc[current_ts]
