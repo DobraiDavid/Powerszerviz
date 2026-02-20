@@ -325,9 +325,9 @@ def main() -> None:
     ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1, 1, 2, 2, 3])
 
     with ctrl1:
-        prev_clicked = st.button("◀ Előző perc")
+        prev_clicked = st.button("◀ Előző")
     with ctrl2:
-        next_clicked = st.button("Következő perc ▶")
+        next_clicked = st.button("Következő ▶")
 
     # Resolve navigation BEFORE the selectboxes render their default index
     navigated = False
@@ -348,6 +348,11 @@ def main() -> None:
             st.session_state["current_ts"] = current_ts
         navigated = True
 
+    # When navigating, always derive date_selected from the (already updated) current_ts
+    # so the dropdowns follow along even across day boundaries.
+    if navigated:
+        date_selected = current_ts.date()
+    
     with ctrl3:
         current_date_label = label_date(current_ts.date())
         try:
@@ -360,7 +365,8 @@ def main() -> None:
             index=default_date_idx,
             key=f"date_sel_{mode_key}",
         )
-        date_selected = label_to_date[selected_date_label]
+        if not navigated:
+            date_selected = label_to_date[selected_date_label]
 
     with ctrl4:
         times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
@@ -369,13 +375,14 @@ def main() -> None:
                 default_time_idx = times_for_date.index(current_ts.time())
             else:
                 default_time_idx = 0
-            time_selected = st.selectbox(
+            st.selectbox(
                 "Perc (csak ahol van adat)",
                 options=times_for_date,
                 index=default_time_idx,
                 key=f"time_sel_{mode_key}",
             )
             if not navigated:
+                time_selected = times_for_date[default_time_idx]
                 combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
                 if combined_ts in df.index:
                     current_ts = combined_ts
