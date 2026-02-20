@@ -93,9 +93,7 @@ p, span, label, div { color: #1a1f2e !important; }
     color: #1a1f2e !important;
 }
 [data-baseweb="popover"] li:hover,
-[data-baseweb="menu"] li:hover {
-    background-color: #eef0f4 !important;
-}
+[data-baseweb="menu"] li:hover { background-color: #eef0f4 !important; }
 [data-testid="stTable"] { background-color: #ffffff !important; }
 [data-testid="stTable"] table {
     font-family: 'IBM Plex Mono', monospace !important;
@@ -178,7 +176,7 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
             "50%{box-shadow:0 0 0 5px rgba(239,68,68,.0)}}"
             "#risk-card{animation:soft-pulse 2s ease-in-out infinite;}</style>"
         )
-    html = (
+    return (
         f"{pulse}"
         '<div id="risk-card" style="'
         f'background:{c["bg"]};border:1.5px solid {c["border"]};border-radius:8px;'
@@ -197,7 +195,6 @@ def risk_banner_html(risk_label: str, p_aggregate: float | None) -> str:
         f'{pct_bar}'
         '</div>'
     )
-    return html
 
 
 def status_pill(label: str, color: str, icon: str) -> str:
@@ -237,12 +234,33 @@ def find_nearest_index(idx: pd.DatetimeIndex, ts: pd.Timestamp) -> Optional[pd.T
     return None if pos == -1 else idx[pos]
 
 
+def _sync_dropdown_keys(mode_key: str, current_ts: pd.Timestamp,
+                        date_labels: list, label_date_fn,
+                        df: pd.DataFrame) -> bool:
+    """
+    Write the correct values into the selectbox session-state keys
+    ONLY when no widget with those keys has been created yet in this run.
+    Returns True if keys were changed and a rerun is needed.
+    """
+    date_key = f"date_sel_{mode_key}"
+    time_key = f"time_sel_{mode_key}"
+
+    want_date = label_date_fn(current_ts.date())
+    tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
+    want_time = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
+
+    changed = False
+    if st.session_state.get(date_key) != want_date:
+        st.session_state[date_key] = want_date
+        changed = True
+    if st.session_state.get(time_key) != want_time:
+        st.session_state[time_key] = want_time
+        changed = True
+    return changed
+
+
 def main() -> None:
-    st.set_page_config(
-        page_title="Powerszerviz előrejelzés",
-        layout="wide",
-        page_icon="⚡",
-    )
+    st.set_page_config(page_title="Powerszerviz előrejelzés", layout="wide", page_icon="⚡")
     st.markdown(CSS, unsafe_allow_html=True)
 
     mode = st.sidebar.radio("Mód", ["Hiba", "Karbantartás"], index=0)
@@ -257,16 +275,17 @@ def main() -> None:
 
     df = load_merged_frame(mode_key)
 
-    # ── Session state ─────────────────────────────────────────────────────────
+    # ── Session state init ────────────────────────────────────────────────────
     if "current_ts" not in st.session_state:
         st.session_state["current_ts"] = df.index[0]
     if "last_mode" not in st.session_state:
         st.session_state["last_mode"] = mode_key
     if st.session_state["last_mode"] != mode_key:
-        # Mode switched: reset everything
         st.session_state["current_ts"] = df.index[0]
         st.session_state["last_mode"] = mode_key
-        for k in [f"date_sel_{mode_key}", f"time_sel_{mode_key}"]:
+        # Clear stale widget keys from old mode
+        for k in [f"date_sel_fault", f"date_sel_maintenance",
+                  f"time_sel_fault", f"time_sel_maintenance"]:
             st.session_state.pop(k, None)
 
     # ── Event days ────────────────────────────────────────────────────────────
@@ -285,109 +304,101 @@ def main() -> None:
     label_to_date = dict(zip(date_labels, available_dates))
 
     current_ts: pd.Timestamp = st.session_state["current_ts"]
+    date_key = f"date_sel_{mode_key}"
+    time_key = f"time_sel_{mode_key}"
 
-    date_sel_key = f"date_sel_{mode_key}"
-    time_sel_key = f"time_sel_{mode_key}"
-
-    # Initialise selectbox keys only when they don't exist yet.
-    # After first creation Streamlit owns the values — we must not overwrite them
-    # except via st.rerun() after a button press.
-    if date_sel_key not in st.session_state:
-        st.session_state[date_sel_key] = label_date(current_ts.date())
-    if time_sel_key not in st.session_state:
-        tfd0 = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-        st.session_state[time_sel_key] = current_ts.time() if tfd0 else None
+    # ── KEY INSIGHT: sync widget keys to current_ts BEFORE any widget renders.
+    # This is only safe here because no widget with these keys exists yet in
+    # this script run. If keys changed, rerun immediately so the widgets
+    # see the updated values on a clean pass.
+    # This is triggered after button navigation (which sets a "nav_pending" flag).
+    # ─────────────────────────────────────────────────────────────────────────
+    if st.session_state.pop("nav_pending", False):
+        tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
+        want_time = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
+        st.session_state[date_key] = label_date(current_ts.date())
+        st.session_state[time_key] = want_time
+        # No rerun needed here — keys are set before widgets; script continues cleanly.
 
     # ── Layout ────────────────────────────────────────────────────────────────
     col_date, col_time, col_risk = st.columns([2, 2, 3])
 
-    # ── Date column ───────────────────────────────────────────────────────────
     with col_date:
         selected_date_label = st.selectbox(
             "Dátum  (🔴 = esemény nap)",
             options=date_labels,
-            key=date_sel_key,
+            key=date_key,
         )
         date_selected = label_to_date[selected_date_label]
         d_prev_col, d_next_col = st.columns(2)
         with d_prev_col:
             date_prev_clicked = st.button("◀ Előző nap", key="btn_date_prev", use_container_width=True)
         with d_next_col:
-            date_next_clicked = st.button("Következő nap ▶", key="btn_date_next", use_container_width=True)
+            date_next_clicked = st.button("Köv. nap ▶", key="btn_date_next", use_container_width=True)
 
-    # ── Time column ───────────────────────────────────────────────────────────
     with col_time:
         times_for_date = sorted({ts.time() for ts in df.index if ts.date() == date_selected})
-        # If stored time value isn't valid for the current date options, clamp it
-        if st.session_state.get(time_sel_key) not in times_for_date:
-            st.session_state[time_sel_key] = times_for_date[0] if times_for_date else None
+        # Clamp stored time to valid options (date may have changed via selectbox)
+        if st.session_state.get(time_key) not in times_for_date:
+            st.session_state[time_key] = times_for_date[0] if times_for_date else None
         time_selected = st.selectbox(
             "Perc (csak ahol van adat)",
-            options=times_for_date if times_for_date else [None],
-            key=time_sel_key,
+            options=times_for_date if times_for_date else ["–"],
+            key=time_key,
         )
         t_prev_col, t_next_col = st.columns(2)
         with t_prev_col:
             time_prev_clicked = st.button("◀ Előző perc", key="btn_time_prev", use_container_width=True)
         with t_next_col:
-            time_next_clicked = st.button("Következő perc ▶", key="btn_time_next", use_container_width=True)
+            time_next_clicked = st.button("Köv. perc ▶", key="btn_time_next", use_container_width=True)
 
     # ── Navigation logic ──────────────────────────────────────────────────────
-    # Buttons: update current_ts + overwrite widget keys, then rerun so the
-    # dropdowns re-render with the correct values cleanly.
-    # Selectbox manual pick: current_ts is derived from widget values directly.
+    # Buttons: update current_ts, set nav_pending flag, then rerun.
+    # The next run will sync the widget keys BEFORE the widgets are created.
+    # Selectbox: values already in session state via key=; just update current_ts.
 
     if time_prev_clicked:
         pos = df.index.get_loc(current_ts)
         if isinstance(pos, slice):
             pos = pos.start
         if pos - 1 >= 0:
-            current_ts = df.index[pos - 1]
-            st.session_state["current_ts"] = current_ts
-            st.session_state[date_sel_key] = label_date(current_ts.date())
-            tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-            st.session_state[time_sel_key] = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
-            st.rerun()
+            st.session_state["current_ts"] = df.index[pos - 1]
+        st.session_state["nav_pending"] = True
+        st.rerun()
 
     elif time_next_clicked:
         pos = df.index.get_loc(current_ts)
         if isinstance(pos, slice):
             pos = pos.start
         if pos + 1 < len(df.index):
-            current_ts = df.index[pos + 1]
-            st.session_state["current_ts"] = current_ts
-            st.session_state[date_sel_key] = label_date(current_ts.date())
-            tfd = sorted({ts.time() for ts in df.index if ts.date() == current_ts.date()})
-            st.session_state[time_sel_key] = current_ts.time() if current_ts.time() in tfd else (tfd[0] if tfd else None)
-            st.rerun()
+            st.session_state["current_ts"] = df.index[pos + 1]
+        st.session_state["nav_pending"] = True
+        st.rerun()
 
     elif date_prev_clicked:
-        cur_date_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
-        if cur_date_idx > 0:
-            new_date = available_dates[cur_date_idx - 1]
+        cur_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
+        if cur_idx > 0:
+            new_date = available_dates[cur_idx - 1]
             tfd = sorted({ts.time() for ts in df.index if ts.date() == new_date})
             if tfd:
-                current_ts = pd.Timestamp(datetime.combine(new_date, tfd[0]))
-                st.session_state["current_ts"] = current_ts
-                st.session_state[date_sel_key] = label_date(new_date)
-                st.session_state[time_sel_key] = tfd[0]
-                st.rerun()
+                st.session_state["current_ts"] = pd.Timestamp(datetime.combine(new_date, tfd[0]))
+        st.session_state["nav_pending"] = True
+        st.rerun()
 
     elif date_next_clicked:
-        cur_date_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
-        if cur_date_idx < len(available_dates) - 1:
-            new_date = available_dates[cur_date_idx + 1]
+        cur_idx = available_dates.index(current_ts.date()) if current_ts.date() in available_dates else 0
+        if cur_idx < len(available_dates) - 1:
+            new_date = available_dates[cur_idx + 1]
             tfd = sorted({ts.time() for ts in df.index if ts.date() == new_date})
             if tfd:
-                current_ts = pd.Timestamp(datetime.combine(new_date, tfd[0]))
-                st.session_state["current_ts"] = current_ts
-                st.session_state[date_sel_key] = label_date(new_date)
-                st.session_state[time_sel_key] = tfd[0]
-                st.rerun()
+                st.session_state["current_ts"] = pd.Timestamp(datetime.combine(new_date, tfd[0]))
+        st.session_state["nav_pending"] = True
+        st.rerun()
 
     else:
-        # No button pressed — trust the selectbox values directly
-        if time_selected is not None:
+        # Manual selectbox pick — widget keys already updated by Streamlit.
+        # Just sync current_ts from the widget values.
+        if times_for_date and time_selected != "–":
             combined_ts = pd.Timestamp(datetime.combine(date_selected, time_selected))
             if combined_ts in df.index:
                 current_ts = combined_ts
